@@ -1,4 +1,5 @@
-Тестовая среда: любой Linux с docker и docker-compose
+- Тестовая среда: любой Linux с docker и docker-compose
+- Запуск из каталога: docker-compose up -d
 
 Напишите файл docker-compose.yml который будет описывать установку кластера из 4х нод. 
 
