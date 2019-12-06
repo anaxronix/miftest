@@ -1,0 +1,4 @@
+[all]
+miftest-1		  ansible_user=root	ansible_host=192.168.122.132	ansible_ssh_port=22
+
+

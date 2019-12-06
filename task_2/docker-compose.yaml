@@ -1,0 +1,122 @@
+version: '2'
+
+networks:
+  web:
+    external: false
+  internal:
+    external: false
+
+volumes:
+    phpsocket-w1:
+    phpsocket-w2:
+
+services:
+    # Balancer
+    miftest-b1:
+      image: nginx:1.12
+      container_name: miftest-balancer
+      restart: always
+      volumes:
+        - ./miftest-b1/config/nginx.conf:/etc/nginx/nginx.conf
+      networks:
+        - internal
+        - web
+      depends_on:
+        - miftest-w1
+        - miftest-w2
+      ports:
+        - 80:80
+        - 443:80
+
+    # NGINX1 + PHP-FPM
+    #--- nginx miftest-w1
+    miftest-w1:
+      image: nginx:1.12
+      container_name: miftest-w1
+      restart: always
+      volumes:
+        - ./miftest-w1/htdocs:/var/www/htdocs
+        - ./miftest-w1/config/nginx.conf:/etc/nginx/nginx.conf
+        - phpsocket-w1:/sock
+      expose:
+        - "80"
+      networks:
+        - internal
+      depends_on:
+        - php-fpm_miftest-w1
+        - miftest_mysql
+        - miftest-rsync-w1-w2
+
+    #--- php miftest-w1    
+    php-fpm_miftest-w1:
+      image: php:7.4-fpm
+      container_name: php-fpm_miftest-w1
+      restart: always
+      volumes:
+          - ./miftest-w1/htdocs:/var/www/htdocs
+          - ./php-fpm/php-fpm.conf:/usr/local/etc/php-fpm.conf
+          - phpsocket-w1:/sock
+      networks:
+        - internal
+
+    # NGINX2 + PHP-FPM
+    #--- nginx miftest-w2      
+    miftest-w2:
+      image: nginx:1.12
+      container_name: miftest-w2
+      restart: always
+      volumes:
+        - ./miftest-w2/htdocs:/var/www/htdocs
+        - ./miftest-w2/config/nginx.conf:/etc/nginx/nginx.conf
+        - phpsocket-w2:/sock
+      expose:
+        - "80"
+      networks:
+        - internal
+      depends_on:
+        - php-fpm_miftest-w2
+        - miftest_mysql
+        - miftest-rsync-w1-w2
+
+    #--- php miftest-w2        
+    php-fpm_miftest-w2:
+      image: php:7.4-fpm
+      container_name: php-fpm_miftest-w2
+      restart: always
+      volumes:
+        - ./miftest-w2/htdocs:/var/www/htdocs
+        - ./php-fpm/php-fpm.conf:/usr/local/etc/php-fpm.conf
+        - phpsocket-w2:/sock
+      networks:
+        - internal
+    # MySQL (MariaDB)
+    miftest_mysql:
+      image: mariadb
+      container_name: miftest_mysql
+      restart: always
+      networks:
+        - internal
+      volumes:
+        - ./mysql:/var/lib/mysql
+      environment:
+        - MYSQL_DATABASE=mysql_db1
+        - MYSQL_USER=mysql_db_user
+        - MYSQL_PASSWORD=mysql_db_password123
+        - MYSQL_ROOT_PASSWORD=superUserPassword123
+
+    # RSYNC <-> between 2 'files' dir miftest-w1 and miftest-w2     
+    miftest-rsync-w1-w2:
+        image: alpine:3.5
+        container_name: miftest-rsync-w1-w2
+        restart: always
+        volumes:
+         - ./miftest-w1/htdocs/files:/files-w1
+         - ./miftest-w2/htdocs/files:/files-w2 
+        command: "sh -c 'apk update; apk add -y rsync; while true; do \
+                        rsync -aHAXxv /files-w1/ /files-w2/; sleep 2; \
+                        rsync -aHAXxv /files-w2/ /files-w1/; sleep 2; \
+                         done';"
+        
+
+
+

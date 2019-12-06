@@ -1,0 +1,111 @@
+---
+- hosts: all
+  become: yes
+  become_user: root
+  remote_user: root
+
+  vars:
+    ansible_python_interpreter: "/usr/bin/python3"
+
+  tasks:
+
+    # Prepare Linux host for install Jenkins woth NGINX Proxy 
+    # Configure OS
+    - name: Install base package
+      apt: 
+        name: "{{ packages }}" 
+        state: present 
+        update_cache: yes
+        force: yes
+      vars:
+        packages:
+        - bash-completion 
+        - htop 
+        - net-tools 
+        - wget 
+        - zip 
+        - awscli
+        - build-essential
+        - apt-transport-https
+        - ca-certificates
+        - acl
+        - ntp
+        - htop
+        - git
+        - libpq-dev
+        - python3.6
+        - python3-dev
+        - python3-pip
+        - python-pycurl
+        - supervisor
+        - unzip
+
+    - name: Update and upgrade apt packages
+      apt:
+        force_apt_get: yes
+        upgrade: yes
+        update_cache: yes
+        cache_valid_time: 86400
+
+    - name: Upgrade pip
+      pip: 
+        name: pip 
+        state: latest
+      
+    # Install Jenkins
+    - name: Install packages and dependencies
+      apt: name={{ item }} update_cache=yes state=present
+      with_items:
+        - openjdk-8-jdk  # For run Jenkins
+        - libfontconfig
+        - libffi-dev
+        - libncurses5-dev
+
+    - name: Add Jenkins  GPG key to  repo
+      apt_key: url=http://pkg.jenkins-ci.org/debian/jenkins-ci.org.key
+              state=present
+
+    - name: Add Jenkins repo to apt list
+      apt_repository: repo='deb http://pkg.jenkins-ci.org/debian binary/'
+                  update_cache=yes
+                  state=present
+
+    - name: Install Jenkins server
+      apt: name=jenkins 
+          state=present
+
+    - name: Install additional Python packages
+      pip: name={{ item }} state=latest
+      with_items:
+        - ansible
+        - boto
+        - flake8
+        - passlib    
+    
+    # Install NGINX
+    - name: Install Nginx
+      apt: name=nginx update_cache=yes state=present
+      run_once: true
+
+    - name: Create  Nginx configuration file
+      template: src=jenkins.j2
+            dest=/etc/nginx/sites-available/jenkins.conf
+            backup=yes
+    
+    - name: Disable default site
+      file: path=/etc/nginx/sites-enabled/default state=absent
+    
+    - name: Jenkins site is enabled
+      file: src=/etc/nginx/sites-available/jenkins.conf
+        dest=/etc/nginx/sites-enabled/jenkins.
+        state=link
+
+    - name: RUN  Jenkins service is started
+      service: name=jenkins state=restarted enabled=yes
+      
+    - name: RUN  Nginx service is started
+      service: name=nginx state=restarted enabled=yes
+
+    
+  
+
